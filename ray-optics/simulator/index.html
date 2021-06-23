@@ -1,0 +1,263 @@
+﻿<!DOCTYPE html>
+<html manifest="manifest/manifest.appcache">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0">
+  <meta property="og:title" content="Ray Optics Simulation">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="../ray-optics/">
+  <meta property="og:image" content="img/image.png">
+  <meta property="og:description" content="An open-source web app to simulate reflection and refraction of light.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="white">
+
+  <title>Ray Optics Simulation</title>
+  <link rel="icon" href="img/icon128.png" type="image/png">
+  <link rel="manifest" href="manifest/manifest.json">
+  <link rel="apple-touch-icon" href="img/icon128.png">
+  <!--Import CSSs-->
+  <link rel="stylesheet" href="lib/jquery-ui.css">
+  <link rel="stylesheet" href="lib/bootstrap.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body style="background-color:rgb(0,0,0); overflow:hidden;">
+
+
+<!-- Toolbar -->
+  <canvas id="canvas1" style="position: absolute; top: 0; left: 0; z-index: -1">
+  </canvas>
+  <div id="toolbar" style="background-color: white"
+  data-bind="foreach: toolbarGroups">
+    <label class="btn-group">
+      <div class="input-group-text" style="border-top-right-radius: 0; border-bottom-right-radius: 0;"
+      data-bind="text: getLocaleName()"></div>
+      <!-- ko foreach: tools -->
+      <!-- ko if: type == 1/*ToolTypeEnum.RADIO*/ -->
+      <label class="btn btn-secondary"
+       data-toggle="popover" data-trigger="hover" data-html="true"
+       data-bind="css: {'active': $parent.selected() == name}, attr: {title: getTitle(), 'data-content': getContent()}">
+        <span data-bind="text: getLocaleName()"></span>
+        <input type="radio" autocomplete="off"
+        data-bind="attr: {name: $parent.title, id: id}, value: name, checked: $parent.selected">
+      </label>
+      <!-- /ko -->
+      <!-- ko if: type == 2/*ToolTypeEnum.RADIOLIST*/ -->
+      <label class="btn btn-secondary dropdown-toggle"
+      data-bind="css: {'active': $parent.selected() == name}, attr: {style: 'z-index: ' + description + ' !important'}">
+        <!-- Show child text before current text. -->
+        <!--<span data-bind="text: selected"></span>-->
+        <span data-bind="text: getLocaleName()"></span>
+        <input type="radio" autocomplete="off"
+        data-bind="attr: {name: $parent.title, id: id}, value: name, checked: $parent.selected">
+        <div class="dropdown-menu" style="padding:0; margin:0; min-width:100%;">
+          <div class="btn-group-vertical" style="padding:0; margin:0; width:100%" data-toggle="buttons">
+            <!-- ko foreach: content -->
+            <label class="btn btn-secondary" style="margin:0"
+            data-toggle="popover" data-trigger="hover" data-html="true"
+            data-bind="css: {'active': $parent.selected() == name}, attr: {title: getTitle(), 'data-content': getContent()}">
+              <span data-bind="text: getLocaleName()"></span>
+              <input type="radio" autocomplete="off"
+              data-bind="attr: {name: $parent.name, id: id}, value: name, checked: $parent.selected">
+            </label>
+            <!-- /ko -->
+          </div>
+        </div>
+      </label>
+      <!-- /ko -->
+      <!-- ko if: type == 3/*ToolTypeEnum.BUTTON*/ -->
+      <label class="btn btn-secondary"
+      data-toggle="popover" data-trigger="hover" data-html="true"
+      data-bind="attr: {title: getTitle(), 'data-content': getContent(), id: id}">
+        <span data-bind="text: getLocaleName()"></span>
+      </label>
+      <!-- /ko -->
+      <!-- ko if: type == 4/*ToolTypeEnum.CHECK*/ -->
+      <div class="btn-group">
+        <label class="btn btn-primary"
+        data-toggle="popover" data-trigger="hover" data-html="true"
+        data-bind="css: {'active': selected() == true}, attr: {title: getTitle(), 'data-content': getContent()}">
+          <input type="checkbox" autocomplete="off"
+          data-bind="checked: selected, attr: {id: id}">
+          <span data-bind="text: getLocaleName()"></span>
+        </label>
+      </div>
+      <!-- /ko -->
+      <!-- ko if: type == 5/*ToolTypeEnum.SLIDE*/ -->
+      <div class="btn btn-static"
+        data-toggle="popover" data-trigger="hover" data-html="true"
+        data-bind="attr: {title: getTitle(), 'data-content': getContent()}">
+        <span data-bind="text: getLocaleName() + ' :'"></span>
+        <!-- TODO: Add validation, http://knockoutjs.com/documentation/extenders.html -->
+        <input type="text" style="width: 80px"
+         data-bind="value: value, valueUpdate: 'input', attr: {id: id + '_txt'}">
+        <input type="range" style="vertical-align: middle"
+         data-bind="attr: {min: min, max: max, step: step, id: id}, value: value, valueUpdate: 'input'">
+      </div>
+      <!-- /ko -->
+      <!-- ko if: type == 6/*ToolTypeEnum.HELP*/ -->
+      <div class="btn-group">
+        <label class="btn btn-danger"
+        data-toggle="popover" data-trigger="hover" data-html="true"
+        data-bind="css: {'active': selected() == true}, attr: {title: getTitle(), 'data-content': getContent()}">
+          <input id="help" type="checkbox" autocomplete="off"
+          data-bind="checked: selected">
+          <span data-bind="text: getLocaleName()"></span>
+        </label>
+      </div>
+      <!-- /ko -->
+      <!-- /ko -->
+    </label>
+  </div>
+
+<div style="width:100%;">
+  <div class="mainbox" id="mainbox" style="width:100%; display: none">
+    <div style="float: right; text-align:right; margin-right:5px">
+      <div>
+        <input type="button" id="undo" disabled>
+        <input type="button" id="redo" disabled>
+        <input type="button" id="reset">
+        <input type="button" id="accessJSON" style="display:none;">
+        <input type="button" id="save">
+        <input type="button" id="open">
+        <input type="button" id="save_canvas">
+        <input type="file" id="openfile" style="display:none">
+      </div>
+      <div style="margin-top:2px">
+        <label id="showgrid_">
+          <input type="checkbox" id="showgrid">
+          <span id="showgrid_title"></span>
+        </label>
+        <label id="grid_">
+          <input type="checkbox" id="grid">
+          <span id="grid_title"></span>
+        </label>
+        <label id="lockobjs_">
+          <input type="checkbox" id="lockobjs">
+          <span id="lockobjs_title"></span>
+        </label>
+      </div>
+    </div>
+
+    <!--==============barre d'outils===================-->
+    <div class="optionsbar">
+      <span id="toolbar_title"></span>
+      <input type="button" class="toolbtn" id="tool_laser">
+      <input type="button" class="toolbtn" id="tool_parallel">
+      <input type="button" class="toolbtn" id="tool_radiant">
+      <input type="button" class="toolbtn" id="tool_mirror_">
+      <input type="button" class="toolbtn" id="tool_refractor_">
+      <input type="button" class="toolbtn" id="tool_blackline">
+      <input type="button" class="toolbtn" id="tool_ruler">
+      <input type="button" class="toolbtn" id="tool_protractor">
+      <input type="button" class="toolbtn" id="tool_regular">
+      <input type="button" class="toolbtn" id="tool_text">&nbsp;
+      <input type="button" class="toolbtn" id="tool_">
+    </div>
+    <div class="optionsbar">
+      <span id="modebar_title"></span>
+      <input type="button" class="toolbtn" id="mode_light">
+      <input type="button" class="toolbtn" id="mode_extended_light">
+      <input type="button" class="toolbtn" id="mode_images">
+      <input type="button" class="toolbtn" id="mode_observer">
+      <span id="rayDensity_title"></span>
+      <input type="range" id="rayDensity" min="-3" max="3" step="0.0001" value="-2.3026">
+      <span id="status" style="display:none;"></span>
+    </div>
+  </div>
+  <div id="obj_settings" class="settingsbox" style="left:0; width:100%; display:none; background-color: rgb(255, 153, 0);">
+    <div class="optionsbar">
+      <span id="obj_name"></span>
+      <span id="p_box">&nbsp;
+        <span id="p_name"></span>
+        <input type="range" id="objAttr_range">
+        <input type="text" id="objAttr_text" style="width:40px;">
+        <span id="setAttrAll_box">
+          <label id="setAttrAll_">
+            <input type="checkbox" id="setAttrAll">
+            <span id="setAttrAll_title"></span>
+          </label>
+        </span>
+      </span>
+      <input type="button" id="copy">
+      <input id="delete" type="button">
+      <!--================Rotation point==================-->
+      <input type="button" id="objSetPointRot_button" style="display:none;">
+      <!--===================Group========================-->
+      <input type="button" id="toggleGroupPanel_button">
+      <!--===================Cauchy=======================-->
+      <input type="button" id="cauchy_button">
+      <!--================Show arrow on key==================-->
+      <label for="showArrowOnRay"></label>
+      <input type="checkbox" id="showArrowOnRay" style="display: inline;">
+      <!--================Parasitic rays==================-->
+      <label for="showParasiticRays"></label>
+      <input type="checkbox" id="showParasiticRays" style="display: inline;">
+    </div>
+  </div>
+</div>
+<div id="forceStop" class="forcestopbox" style="top:10px; left:10px; display:none;"></div>
+<textarea id="textarea1" style="position: absolute; bottom: 0; left: 0; width: 99%; height: 100px; display:none;"></textarea>
+
+<!--=================Boîte d'archives================-->
+<div id="saveBox" class="saveBox" style="right:0px; padding-left: 3px; padding-bottom: 3px; display:none;">
+  <span id="save_name_title"></span>
+  <input type="text" id="save_name" style="width:200px;" value="">
+  <input type="button" id="save_confirm"><input type="button" id="save_cancel"><br>
+  <div id="save_description" style="font-size:10pt; display: none;"></div>
+</div>
+<img src="img/http-app.png" 
+    style="width: 15%; z-index: 10; position: absolute; right: 5%; top: 2%;" />
+<!--===============Menu déroulant de la barre d'outils==================-->
+<div class="toollistbox" id="tool_mirror_list" style="position:absolute; display:none;">
+  <input type="button" class="toollistbtn" id="tool_mirror"><br>
+  <input type="button" class="toollistbtn" id="tool_arcmirror"><br>
+  <input type="button" class="toollistbtn" id="tool_idealmirror">
+</div>
+<div class="toollistbox" id="tool_refractor_list" style="position:absolute; display:none;">
+  <input type="button" class="toollistbtn" id="tool_halfplane"><br>
+  <input type="button" class="toollistbtn" id="tool_circlelens"><br>
+  <input type="button" class="toollistbtn" id="tool_refractor"><br>
+  <input type="button" class="toollistbtn" id="tool_lens">
+</div>
+
+<!--================Zone de saisie des coordonnées=================-->
+<input type="text" id="xybox" style="background-color:rgba(0,0,0,0.5); color:white; position:absolute; border:none; display:none;" value="">
+
+<div style="position:absolute; right:0; bottom: 0; color:rgba(255,255,255,0.25); font-size:9pt;">
+  <span id="footer_message">Developed by ricktu288, j3soon</span>
+  |
+  <a href="https://http-appoptique.github.io/ray-optics/" target="_blank" style="color:rgba(255,255,255,0.25)" id="homepage">Home</a>
+  |
+  <a href="https://github.com/HTTP-AppOptique/ray-optics" target="_blank" style="color:rgba(255,255,255,0.25)" id="source">Source</a>
+</div>
+
+<!--======================= Panel to group ======================================-->
+
+<!--Import scripts-->
+<script src="lib/jquery-3.3.1.min.js"></script>
+<script src="lib/popper.min.js"></script>
+<script src="lib/bootstrap.min.js"></script>
+<script src="lib/knockout-min.js"></script>
+<script src="lib/jquery-ui.js"></script>
+<script src="lib/FileSaver.js"></script>
+
+<script src="js/graphs.js"></script>
+<script src="js/canvaspainter.js"></script>
+<script src="js/object.js"></script>
+<script src="js/index.js"></script>
+<script src="js/canvas_event_manager.js"></script>
+
+<script src="i18n/fr.js"></script>
+<script src="i18n/en.js"></script>
+<script src="i18n/zh_CN.js"></script>
+<script src="i18n/zh_TW.js"></script>
+
+<!--View Models scripts-->
+<script src="js/ToolBarGroup.js"></script>
+<script src="js/ToolBarViewModel.js"></script>
+<script src="js/script.js"></script>
+
+</body>
+</html>
